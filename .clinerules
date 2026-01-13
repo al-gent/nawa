@@ -1,0 +1,194 @@
+# NawaConnect - Service Marketplace Platform
+
+## Project Overview
+Two-sided marketplace connecting service professionals (braiders, barbers, tutors, plumbers) with clients in Namibia. Launching in Windhoek and Swakopmund.
+
+MVP features: professional profiles, service listings, search/discovery, booking system with real-time availability, admin approval workflow.
+
+## Tech Stack
+- **Frontend**: Next.js 14 (App Router), React, Tailwind CSS
+- **Backend**: Next.js API routes (in /app/api/)
+- **Database**: Supabase PostgreSQL with Row Level Security (RLS)
+- **Auth**: Supabase Auth (email/password + magic links)
+- **Storage**: Supabase Storage (for images)
+- **Maps**: Google Maps Platform (Places API for autocomplete, Geocoding API for distances)
+- **Deployment**: Vercel
+
+## Key Conventions
+- Use **JavaScript** (NOT TypeScript)
+- Mobile-first responsive design (Tailwind breakpoints)
+- All database operations go through Supabase client
+- Every table MUST have RLS policies enabled
+- API routes live in `/app/api/[route]/route.js`
+- Components use React hooks (functional components only)
+- Use Next.js App Router (not Pages Router)
+
+## Database Schema
+
+### Tables:
+1. **professional_profiles**
+   - Links to auth.users
+   - Contains: business_name, bio, location (address, lat, lng), service_type, portfolio_images[], verification_status, verification_documents[]
+
+2. **services**
+   - Links to professional_profiles
+   - Contains: name, description, price, duration_minutes, is_active
+
+3. **bookings**
+   - Links to clients (auth.users), professionals, services
+   - Contains: start_time, end_time, status (pending/confirmed/cancelled/completed), location_type, client_location, notes
+
+4. **availability_rules**
+   - Recurring weekly schedule per professional
+   - Contains: day_of_week (0-6), start_time, end_time, is_active
+
+5. **availability_overrides**
+   - One-time schedule exceptions
+   - Contains: date, start_time, end_time, is_available
+
+6. **reviews**
+   - Links to bookings (one review per booking)
+   - Contains: rating (1-5), comment
+
+### seed databases with some fake data to start so i can play around with search and stuff
+
+### RLS Policies:
+- Clients can only see their own bookings
+- Professionals can only see/edit their own profile, services, availability, and their bookings
+- Admins can see everything
+- Public can read approved professional profiles and services (for search)
+
+## Important Business Rules
+
+### Professional Onboarding:
+- Multi-step wizard: Basic Info → Services → Portfolio → Verification → Review
+- Status starts as "pending" until admin approves
+
+### Availability System:
+- Professionals set recurring weekly hours (availability_rules)
+- Can add exceptions/overrides for specific dates
+- All times stored in UTC, display in local timezone
+
+### Booking Engine:
+- Must prevent double-bookings
+- Calculate available slots based on:
+  - Professional's working hours for that day
+  - Service duration
+  - Existing confirmed bookings
+- Booking flow: Client requests → Pro accepts/declines → Status updates
+- **NOTE: Booking engine logic is complex - build basic structure first, refine algorithm iteratively**
+
+### Search & Discovery:
+- Search by service name and location (location uses Google Places Autocomplete)
+- When user selects a location from autocomplete, geocode it to get lat/lng for distance calculations
+- Filter by: price range, rating, distance (calculated from search location to each pro's stored lat/lng), availability
+- Sort by: relevance, distance (using Haversine formula), price, rating
+- Show "Available Today" badge if pro has open slots (calculated from availability_rules + existing bookings)
+- Display distance in km on each result card (e.g., "2.3 km away")
+- 20 results per page with pagination
+- Note: Each professional has lat/lng stored in their profile (geocoded from their business address during onboarding)
+
+
+
+## File Structure
+```
+/app
+  /api
+    /professionals
+    /bookings
+    /search
+    /auth
+  /(routes)
+    /search
+    /professional/[id]
+    /onboarding
+    /dashboard
+      /client
+      /professional
+      /admin
+  /components
+    /ui (reusable components)
+    /forms
+    /maps
+/lib
+  /supabase (client config)
+  /utils (helpers)
+/public
+  /images
+```
+
+## Environment Variables Needed
+```
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=
+```
+
+## Commands
+- `npm run dev` - Start dev server
+- `npm run build` - Build for production
+- `npm run lint` - Run linter
+
+## Phase 1 Tasks (Build These First)
+1. ✅ Project setup with Next.js + Tailwind
+2. ✅ Supabase connection and database schema
+3. ✅ Google Maps Places autocomplete component
+4. ✅ Image upload component (Supabase Storage)
+5. ✅ Landing page with search bar
+6. ✅ Professional onboarding wizard (all steps)
+7. ✅ Search results page with basic filters
+8. ✅ Professional profile page (public view)
+9. ⏳ Booking engine (build structure, refine logic later)
+10. ⏳ Professional dashboard (manage bookings)
+11. ⏳ Client dashboard (view bookings)
+12. ⏳ Admin panel (approve professionals)
+
+## Don't Do (Yet)
+- Payment integration (Paystack) - post-MVP
+- SMS authentication - post-MVP
+- Email notifications - post-MVP
+- Automated reminders - post-MVP
+- Chat/messaging between clients and pros - post-MVP
+
+## Key Design Principles
+- **Mobile-first**: Most users in Namibia will be on mobile
+- **Fast loading**: Keep bundle size small, optimize images
+- **Simple UX**: Don't overthink - make it obvious how to use
+- **Trust signals**: Show ratings, verification badges prominently
+- **Clear CTAs**: "Book Now" buttons should be unmissable
+
+## Common Patterns
+
+### Fetching Data:
+```javascript
+// Use Supabase client for all database operations
+const { data, error } = await supabase
+  .from('professionals')
+  .select('*, services(*)')
+  .eq('verification_status', 'approved')
+```
+
+### Image Upload:
+```javascript
+// Upload to Supabase Storage
+const { data, error } = await supabase.storage
+  .from('portfolio-images')
+  .upload(`${userId}/${fileName}`, file)
+```
+
+### Protected Routes:
+```javascript
+// Check auth status in middleware or component
+const { data: { user } } = await supabase.auth.getUser()
+if (!user) redirect('/login')
+```
+
+## Notes for Claude Code
+- Start with the easy foundational stuff first
+- Build the booking engine structure but don't get stuck on complex availability calculations - we'll refine that algorithm together
+- Focus on getting basic CRUD operations working before optimizing
+- Use shadcn/ui components if helpful for UI (buttons, forms, dialogs)
+- When in doubt, keep it simple - MVP means minimum viable
+- Always enable RLS policies when creating tables
+- Test with seed data as you build
