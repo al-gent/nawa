@@ -4,7 +4,7 @@
  */
 
 const { createClient } = require('@supabase/supabase-js')
-require('dotenv').config({ path: '.env.local' })
+require('dotenv').config()
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -58,14 +58,66 @@ async function createBucket(bucketName, isPublic = true) {
   }
 }
 
+async function setupStoragePolicies() {
+  console.log('Setting up storage policies...')
+
+  // Note: Storage policies must be created via SQL in Supabase Dashboard
+  // Go to: SQL Editor and run the following:
+
+  const policies = `
+-- Enable RLS on storage.objects
+ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+
+-- Policy: Allow authenticated users to upload files
+CREATE POLICY "Authenticated users can upload portfolio images"
+ON storage.objects FOR INSERT
+TO authenticated
+WITH CHECK (
+  bucket_id = 'portfolio-images'
+);
+
+-- Policy: Allow public read access to portfolio images
+CREATE POLICY "Public can read portfolio images"
+ON storage.objects FOR SELECT
+TO public
+USING (bucket_id = 'portfolio-images');
+
+-- Policy: Allow users to update their own files
+CREATE POLICY "Users can update own portfolio images"
+ON storage.objects FOR UPDATE
+TO authenticated
+USING (bucket_id = 'portfolio-images' AND auth.uid()::text = (storage.foldername(name))[1]);
+
+-- Policy: Allow users to delete their own files
+CREATE POLICY "Users can delete own portfolio images"
+ON storage.objects FOR DELETE
+TO authenticated
+USING (bucket_id = 'portfolio-images' AND auth.uid()::text = (storage.foldername(name))[1]);
+  `
+
+  console.log('\n📋 Storage policies SQL:')
+  console.log('─────────────────────────────────────────────────────────')
+  console.log(policies)
+  console.log('─────────────────────────────────────────────────────────')
+  console.log('\n⚠️  Please run the above SQL in your Supabase Dashboard:')
+  console.log('   1. Go to https://supabase.com/dashboard')
+  console.log('   2. Select your project')
+  console.log('   3. Navigate to SQL Editor')
+  console.log('   4. Copy and paste the SQL above')
+  console.log('   5. Click "Run"\n')
+}
+
 async function setupStorage() {
   console.log('🚀 Setting up Supabase Storage buckets...\n')
 
   try {
     // Create portfolio-images bucket
     await createBucket('portfolio-images', true)
-    
-    console.log('\n✅ Storage setup complete!')
+
+    // Show storage policies
+    await setupStoragePolicies()
+
+    console.log('\n✅ Storage bucket setup complete!')
   } catch (error) {
     console.error('\n❌ Storage setup failed:', error.message)
     process.exit(1)

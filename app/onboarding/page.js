@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '../../lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import PlacesAutocomplete from '../../components/maps/PlacesAutocomplete'
@@ -13,6 +13,22 @@ export default function OnboardingPage() {
   const [currentStep, setCurrentStep] = useState(1)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [authChecked, setAuthChecked] = useState(false)
+  const [user, setUser] = useState(null)
+
+  // Check auth on mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { user }, error } = await supabase.auth.getUser()
+      if (error || !user) {
+        router.push('/login?message=Please log in to continue')
+        return
+      }
+      setUser(user)
+      setAuthChecked(true)
+    }
+    checkAuth()
+  }, [supabase, router])
 
   // Form data
   const [formData, setFormData] = useState({
@@ -125,14 +141,16 @@ export default function OnboardingPage() {
     setError(null)
 
     try {
-      // Check if user is logged in
-      const { data: { user } } = await supabase.auth.getUser()
-
+      // Use the user we already fetched on mount
       if (!user) {
-        setError('Please log in to continue')
+        console.error('No user found in session')
+        setError('Please log in to continue. Redirecting to login...')
         setLoading(false)
+        setTimeout(() => router.push('/login'), 2000)
         return
       }
+
+      console.log('User authenticated:', user.id)
 
       // Create professional profile
       const { data: profile, error: profileError } = await supabase
@@ -178,6 +196,18 @@ export default function OnboardingPage() {
       setError(err.message || 'Failed to create profile')
       setLoading(false)
     }
+  }
+
+  // Show loading while checking auth
+  if (!authChecked) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    )
   }
 
   return (

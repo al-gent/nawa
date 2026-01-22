@@ -64,7 +64,7 @@ export default function Header() {
                 ) : (
                   <>
                     <Link
-                      href="/onboarding"
+                      href="/signup?type=professional"
                       className="text-gray-600 hover:text-primary-600 transition-colors hidden sm:block"
                     >
                       Become a Pro

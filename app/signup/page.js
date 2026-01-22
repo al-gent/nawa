@@ -1,12 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '../../lib/supabase/client'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
 export default function SignupPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
 
   const [formData, setFormData] = useState({
@@ -18,6 +19,14 @@ export default function SignupPage() {
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+
+  // Pre-select account type from URL parameter
+  useEffect(() => {
+    const type = searchParams.get('type')
+    if (type === 'professional') {
+      setFormData(prev => ({ ...prev, accountType: 'professional' }))
+    }
+  }, [searchParams])
 
   const handleSignup = async (e) => {
     e.preventDefault()
@@ -51,7 +60,24 @@ export default function SignupPage() {
 
       if (signUpError) throw signUpError
 
-      // Redirect based on account type
+      // Check if session was created
+      if (!data.session) {
+        setError('Please check your email to confirm your account')
+        setLoading(false)
+        return
+      }
+
+      // Verify session is persisted by checking getUser
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+
+      if (userError || !user) {
+        console.error('Session verification failed:', userError)
+        setError('Account created but session failed. Please try logging in.')
+        setLoading(false)
+        return
+      }
+
+      // Session verified, safe to redirect
       if (formData.accountType === 'professional') {
         router.push('/onboarding')
       } else {

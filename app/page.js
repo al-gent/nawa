@@ -201,7 +201,7 @@ export default function HomePage() {
             Join NawaConnect and grow your business. Manage bookings, showcase your work, and reach more clients.
           </p>
           <a
-            href="/onboarding"
+            href="/signup?type=professional"
             className="inline-block bg-white text-primary-600 px-8 py-4 rounded-lg font-semibold text-lg hover:bg-gray-100 transition-colors shadow-lg"
           >
             Become a Professional

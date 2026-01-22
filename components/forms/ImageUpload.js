@@ -182,6 +182,7 @@ export default function ImageUpload({
                 src={url}
                 alt={`Uploaded ${index + 1}`}
                 className="w-full h-32 object-cover rounded-lg"
+                crossOrigin="anonymous"
               />
               <button
                 type="button"
